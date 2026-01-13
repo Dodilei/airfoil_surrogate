@@ -26,8 +26,21 @@ def bernstein_poly(n, t):
     return comb * (t**k) * ((1 - t) ** (n - k))
 
 
-# %% CST BEZIER CURVE
-def cst_bezier(coefs, class_function, degree):
+# %% CST BEZIER CURVE FUNCTION
+def cst_bezier(coefs, class_function):
     """Compute a CST Bezier curve given coefficients, a class function, and degree."""
 
-    return lambda t: class_function(t) * np.dot(bernstein_poly(degree, t).T, coefs)
+    return lambda t: class_function(t) * np.dot(
+        bernstein_poly(coefs.shape[0] - 1, t).T, coefs
+    )
+
+
+# %% CST BEZIER CURVE MATRIX
+def cst_bezier_matrix(coefs, class_function):
+    """Compute a CST Bezier curve given coefficients, a class function, and degree."""
+
+    return (
+        lambda t: class_function(t)[np.newaxis, :]
+        * bernstein_poly(coefs.shape[0] - 1, t)
+        * coefs[:, np.newaxis]
+    )
