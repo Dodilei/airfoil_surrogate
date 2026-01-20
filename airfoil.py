@@ -1,5 +1,6 @@
 import numpy as np
 from cst_bezier import cst_bezier, cst_bezier_matrix
+from scipy.interpolate import PchipInterpolator
 
 
 def camber_line(coefs):
@@ -68,7 +69,7 @@ def parse_airfoil_coordinates(xy_coords, refit=False):
     x2_norm = (x2 - xmin) / (xmax - xmin)
 
     if refit:
-        n_points = refit
+        n_points = refit // 2
     else:
         n_points = max(len(x1), len(x2))
 
@@ -88,7 +89,9 @@ def parse_airfoil_coordinates(xy_coords, refit=False):
     return t1, yu, yl
 
 
-def fit_airfoil_shape_ct(airfoil_coords, order_camber, order_thick, visualize=False):
+def fit_airfoil_shape_ct(
+    airfoil_coords, order_camber, order_thick, visualize=False, return_specs=False
+):
     """Fit an airfoil shape to given coordinates using CST Bezier representation."""
 
     x_base, yu, yl = airfoil_coords
@@ -195,6 +198,46 @@ def fit_airfoil_shape_kulfan(airfoil_coords, order, visualize=False):
         plt.show()
 
     return a0_shared, Au_rest, Al_rest, te_thick
+
+
+def morph_airfoil_ct(
+    airfoil_ct, target_tmax, target_tmaxpos, target_cmax, target_cmaxpos
+):
+    x_base, yc, yt = airfoil_ct
+
+    t_max_idx = yt.argmax()
+    t_max_pos = x_base[t_max_idx] / x_base.max()
+    t_max = yt[t_max_idx]
+
+    c_max_idx = yc.argmax()
+    c_max_pos = x_base[c_max_idx] / x_base.max()
+    c_max = yc[c_max_idx]
+
+    t_scale = target_tmax / t_max
+    c_scale = target_cmax / c_max
+
+    xc_mapper = PchipInterpolator([0, target_cmaxpos, 1], [0, c_max_pos, 1])
+    yc_mapper = PchipInterpolator(x_base, yc)
+
+    x_new_c = xc_mapper(x_base)
+    output_yc = yc_mapper(x_new_c) * c_scale
+
+    xt_mapper = PchipInterpolator([0, target_tmaxpos, 1], [0, t_max_pos, 1])
+    yt_mapper = PchipInterpolator(x_base, yt)
+
+    x_new_t = xt_mapper(x_base)
+    output_yt = yt_mapper(x_new_t) * t_scale
+
+    return x_base, output_yc, output_yt
+
+
+def ct2coords(airfoil_ct):
+    x_base, yc, yt = airfoil_ct
+    upper = np.vstack((x_base, yc + 0.5 * yt)).T[::-1]
+    lower = np.vstack((x_base, yc - 0.5 * yt)).T
+    coords = np.vstack((upper, lower[1:, :]))
+
+    return coords
 
 
 # Example usage:
