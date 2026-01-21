@@ -86,7 +86,7 @@ if __name__ == "__main__":
         "log_Re",
         "t_max",
         "x_t",
-        "m_max",
+        "c_max",
         "x_c",
         "cl_max",
         "cd_at_clmax",
