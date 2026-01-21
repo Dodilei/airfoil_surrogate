@@ -41,18 +41,27 @@ evaluator = AirfoilVarEvaluator(
     slope_window_displacement=2.5,
 )
 
+
+def evaluator_function(X):
+    return evaluator.evaluate_variation(X, xfoil_path=xfoil_path)
+
+
 if __name__ == "__main__":
     profile_samples = generate_lhs(bounds, n_samples=100)
 
     with ProcessPoolExecutor() as executor:
         results = list(
             executor.map(
-                lambda X: evaluator.evaluate_variation(X, xfoil_path=xfoil_path),
+                evaluator_function,
                 profile_samples,
             )
         )
 
     results = np.array(results)
+
+    print(
+        f"Non-convergence rate: {np.isnan(results.sum(axis=1)).sum() / results.shape[0] * 100:.2f}%"
+    )
 
     # Visualize histogram of results for each of the 7 specs
     import matplotlib.pyplot as plt

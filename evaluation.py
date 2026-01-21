@@ -46,6 +46,9 @@ class AirfoilVarEvaluator(object):
             xfoil_path=xfoil_path,
         )
 
+        if len(conv_alpha) < self.conv_threshold:
+            return [np.nan] * 7
+
         return self.extract_parameters(cl, cd, cm, conv_alpha)
 
     def evaluate_airfoil_visual(self, X, xfoil_path="xfoil.exe"):
@@ -193,15 +196,12 @@ class AirfoilVarEvaluator(object):
             Re=reynolds,
             xfoil_command=xfoil_path,
             max_iter=50,
-            timeout=60,
+            timeout=20,
             xfoil_repanel_n_points=150,
         )
         result = xf.alpha(self.alpha_sim)
 
         conv_alpha = np.array(result["alpha"])
-
-        if len(conv_alpha) < self.conv_threshold:
-            return [np.nan] * 7
 
         cl = np.array(result["CL"])
         cd = np.array(result["CD"])

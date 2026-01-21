@@ -51,7 +51,7 @@ def airfoil_coordinates(airfoil, num_points=100):
     return np.vstack((upper_surface[:-1], lower_surface))
 
 
-def parse_airfoil_coordinates(xy_coords, refit=False):
+def parse_airfoil_coordinates(xy_coords, refit=None):
     """Parse airfoil coordinates into upper and lower surfaces."""
     # Assuming coords is an array of shape (2, N)
     mask_side = np.diff(xy_coords[0, :], prepend=0) < 0
