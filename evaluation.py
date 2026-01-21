@@ -24,7 +24,7 @@ class AirfoilVarEvaluator(object):
             (slope_window_center - slope_window_size / 2 - self.alpha_target[0])
             / at_step
         )
-        slope_window_size_idx = int(slope_window_size / at_step)
+        slope_window_size_idx = int(slope_window_size / at_step) + 1
         slope_window_displacement_idx = int(slope_window_displacement / at_step)
 
         self.slope_calculator = ThreeWindowSlope(
@@ -196,7 +196,7 @@ class AirfoilVarEvaluator(object):
             Re=reynolds,
             xfoil_command=xfoil_path,
             max_iter=50,
-            timeout=20,
+            timeout=25,
             xfoil_repanel_n_points=150,
         )
         result = xf.alpha(self.alpha_sim)
