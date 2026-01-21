@@ -30,15 +30,14 @@ bounds = np.vstack((log_reynolds_bounds[np.newaxis, :], bounds))
 alpha_sim = np.concat(
     (np.linspace(-2.5, 2, 10), np.linspace(4, 10, 4), np.linspace(12, 17, 11))
 )
-alpha_target = np.linspace(-3, 17, 41)
 
 evaluator = AirfoilVarEvaluator(
     base_foil_ct=(t1, yc0, yt0),
     alpha_sim=alpha_sim,
     alpha_target_specs=(-3, 17, 41),
-    slope_window_center=1.0,
-    slope_window_size=5.0,
-    slope_window_displacement=2.5,
+    slope_window_center=4.5,
+    slope_window_size=7.0,
+    slope_window_displacement=2.0,
 )
 
 
@@ -47,7 +46,11 @@ def evaluator_function(X):
 
 
 if __name__ == "__main__":
+    print("Generating samples")
     profile_samples = generate_lhs(bounds, n_samples=100)
+
+    print("Evaluating samples (MP)...")
+    print(end="")
 
     with ProcessPoolExecutor() as executor:
         results = list(
@@ -59,10 +62,41 @@ if __name__ == "__main__":
 
     results = np.array(results)
 
+    print("Done.")
+    print()
+
     print(
         f"Non-convergence rate: {np.isnan(results.sum(axis=1)).sum() / results.shape[0] * 100:.2f}%"
     )
 
+    print()
+    print("Saving results to CSV...", end="")
+    import pandas as pd
+
+    all_data = np.concat([profile_samples, results], axis=1)
+
+    col_names = [
+        "log_Re",
+        "t_max",
+        "x_t",
+        "m_max",
+        "x_c",
+        "cl_max",
+        "cd_at_clmax",
+        "cm_at_clmax",
+        "cl_at_cdmin",
+        "cd_min",
+        "cm_at_cdmin",
+        "dclda",
+    ]
+
+    df = pd.DataFrame(all_data, columns=col_names)
+    df.to_csv("surrogate_train_data.csv", index=False)
+
+    print(" Done.")
+
+    print()
+    print("Visualizing results.")
     # Visualize histogram of results for each of the 7 specs
     import matplotlib.pyplot as plt
 
