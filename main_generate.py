@@ -27,8 +27,13 @@ log_reynolds_bounds = np.array([np.log(1e5), np.log(4e5)])
 
 bounds = np.vstack((log_reynolds_bounds[np.newaxis, :], bounds))
 
-alpha_sim = np.concat(
-    (np.linspace(-2.5, 2, 10), np.linspace(4, 10, 4), np.linspace(12, 17, 11))
+alpha_sim = np.concatenate(
+    (
+        np.linspace(-2.5, 2, 8),
+        np.linspace(4, 8, 4),
+        np.linspace(9, 15, 11),
+        np.linspace(16, 17, 3),
+    )
 )
 
 evaluator = AirfoilVarEvaluator(
@@ -40,14 +45,16 @@ evaluator = AirfoilVarEvaluator(
     slope_window_displacement=2.0,
 )
 
+evaluator.xfoil_config_set(path=xfoil_path, max_iter=75, timeout=35)
+
 
 def evaluator_function(X):
-    return evaluator.evaluate_variation(X, xfoil_path=xfoil_path)
+    return evaluator.evaluate_variation(X)
 
 
 if __name__ == "__main__":
     print("Generating samples")
-    profile_samples = generate_lhs(bounds, n_samples=100)
+    profile_samples = generate_lhs(bounds, n_samples=2000)
 
     print("Evaluating samples (MP)...")
     print(end="")
