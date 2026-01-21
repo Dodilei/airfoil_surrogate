@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # ==========================================
 # 1. CONFIGURATION
@@ -146,6 +148,35 @@ def clean_data(
     return df_clean
 
 
+def audit_data_cleaning(df_original, df_cleaned, input_params):
+    # 1. Identify what was dropped
+    dropped_indices = df_original.index.difference(df_cleaned.index)
+    df_dropped = df_original.loc[dropped_indices]
+
+    print("--- Audit Report ---")
+    print(f"Total Samples: {len(df_original)}")
+    print(
+        f"Dropped: {len(df_dropped)} ({len(df_dropped) / len(df_original) * 100:.1f}%)"
+    )
+
+    # 2. Plot Distributions
+    fig, axes = plt.subplots(1, len(input_params), figsize=(20, 4))
+
+    for i, col in enumerate(input_params):
+        # Plot Kept Data
+        sns.kdeplot(df_cleaned[col], ax=axes[i], label="Kept", fill=True, color="green")
+        # Plot Dropped Data
+        sns.kdeplot(
+            df_dropped[col], ax=axes[i], label="Dropped", fill=True, color="red"
+        )
+
+        axes[i].set_title(f"Distribution: {col}")
+        axes[i].legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
 # ==========================================
 # MAIN EXECUTION
 # ==========================================
@@ -153,3 +184,6 @@ if __name__ == "__main__":
     # 1. Load
     df = load_data()
     df_clean = clean_data(df)
+
+    # Optional: Audit Cleaning
+    audit_data_cleaning(df, df_clean, INPUT_COLS)
