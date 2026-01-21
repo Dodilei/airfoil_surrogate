@@ -3,6 +3,8 @@ import aerosandbox
 from airfoil import morph_airfoil_ct, ct2coords
 from util import mellowmax
 
+from scipy.interpolate import PchipInterpolator
+
 
 class AirfoilVarEvaluator(object):
     def __init__(
@@ -34,7 +36,16 @@ class AirfoilVarEvaluator(object):
             displacement=slope_window_displacement_idx,
         )
 
-    def evaluate_variation(self, X, xfoil_path="xfoil.exe"):
+        self.xfoil_path = "xfoil"
+        self.xfoil_max_iter = 50
+        self.xfoil_timeout = 25
+
+    def xfoil_config_set(self, path, max_iter=50, timeout=25):
+        self.xfoil_path = path
+        self.xfoil_max_iter = max_iter
+        self.xfoil_timeout = timeout
+
+    def evaluate_variation(self, X):
         reynolds = int(np.exp(X[0]))
         variation_specs = X[1:]
 
@@ -43,7 +54,6 @@ class AirfoilVarEvaluator(object):
         cl, cd, cm, conv_alpha = self.run_xfoil(
             coords,
             reynolds,
-            xfoil_path=xfoil_path,
         )
 
         if len(conv_alpha) < self.conv_threshold:
@@ -51,7 +61,7 @@ class AirfoilVarEvaluator(object):
 
         return self.extract_parameters(cl, cd, cm, conv_alpha)
 
-    def evaluate_airfoil_visual(self, X, xfoil_path="xfoil.exe"):
+    def evaluate_airfoil_visual(self, X):
         reynolds = int(np.exp(X[0]))
         variation_specs = X[1:]
 
@@ -60,12 +70,11 @@ class AirfoilVarEvaluator(object):
         cl, cd, cm, conv_alpha = self.run_xfoil(
             coords,
             reynolds,
-            xfoil_path=xfoil_path,
         )
 
-        cl_full = np.interp(
-            self.alpha_target, conv_alpha, cl, left=np.nan, right=np.nan
-        )
+        cl_mapper = PchipInterpolator(conv_alpha, cl)
+
+        cl_full = cl_mapper(self.alpha_target)
 
         cl_max, cd_at_clmax, cm_at_clmax, cl_at_cdmin, cd_min, cm_at_cdmin, dclda = (
             self.extract_parameters(cl, cd, cm, conv_alpha)
@@ -183,20 +192,15 @@ class AirfoilVarEvaluator(object):
         plt.tight_layout()
         plt.show()
 
-    def run_xfoil(
-        self,
-        coords,
-        reynolds,
-        xfoil_path="xfoil.exe",
-    ):
+    def run_xfoil(self, coords, reynolds):
         airfoil = aerosandbox.Airfoil(coordinates=coords)
 
         xf = aerosandbox.XFoil(
             airfoil=airfoil,
             Re=reynolds,
-            xfoil_command=xfoil_path,
-            max_iter=50,
-            timeout=25,
+            xfoil_command=self.xfoil_path,
+            max_iter=self.xfoil_max_iter,
+            timeout=self.xfoil_timeout,
             xfoil_repanel_n_points=150,
         )
         result = xf.alpha(self.alpha_sim)
@@ -234,9 +238,10 @@ class AirfoilVarEvaluator(object):
         cl_at_cdmin = cl[cd05_mask].mean()
         cm_at_cdmin = cm[cd05_mask].mean()
 
-        cl_full = np.interp(
-            self.alpha_target, conv_alpha, cl, left=np.nan, right=np.nan
-        )
+        cl_mapper = PchipInterpolator(conv_alpha, cl)
+
+        cl_full = cl_mapper(self.alpha_target)
+
         dclda = self.slope_calculator.get_best_slope(cl_full)
 
         return (
