@@ -1,7 +1,10 @@
 import numpy as np
 import aerosandbox
 
-from concurrent.futures import ProcessPoolExecutor
+import warnings
+
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from tqdm import tqdm
 
 from util import generate_lhs
 from evaluation import AirfoilVarEvaluator
@@ -53,19 +56,28 @@ def evaluator_function(X):
 
 
 if __name__ == "__main__":
+    n_cores = 7
+
     print("Generating samples")
     profile_samples = generate_lhs(bounds, n_samples=5)
 
-    print("Evaluating samples (MP)...")
+    print(f"Evaluating samples (multiprocess, {n_cores} cores)...")
     print(end="")
 
-    with ProcessPoolExecutor() as executor:
-        results = list(
-            executor.map(
-                evaluator_function,
-                profile_samples,
-            )
-        )
+    warnings.filterwarnings("ignore", category=UserWarning, module="aerosandbox")
+
+    with ProcessPoolExecutor(max_workers=n_cores) as executor:
+        # 1. Submit all tasks and create a list of future objects
+        futures = [executor.submit(evaluator_function, x) for x in profile_samples]
+
+        # 2. Wrap as_completed in tqdm for a live progress bar
+        results = []
+        for f in tqdm(
+            as_completed(futures),
+            total=len(futures),
+            desc="Executing XFoil & Spec Evaluation",
+        ):
+            results.append(f.result())
 
     results = np.array(results)
 
