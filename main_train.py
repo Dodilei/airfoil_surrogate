@@ -8,6 +8,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score, mean_squared_error
 
+from data_manager import save_surrogate_pack
+
 # ==========================================
 # 1. CONFIGURATION
 # ==========================================
@@ -302,18 +304,23 @@ if __name__ == "__main__":
     # Optional: Audit Cleaning
     # audit_data_cleaning(df, df_clean, INPUT_COLS)
 
-    df_sample = df_clean  # .sample(n=2000, random_state=42)
+    df_sample = df_clean.sample(n=100, random_state=42)
+
+    models = {}
+    scalers = {}
 
     # 2. Train
-    gp_model, scaler, X_test, y_test, y_pred, y_std, r2, rmse = train_surrogate(
-        df_sample, output_target="cl_max"
-    )
+    for output_target in OUTPUT_COLS:
+        print()
+        print(f"--- Surrogate for {output_target} ---")
+        gp_model, scaler, X_test, y_test, y_pred, y_std, r2, rmse = train_surrogate(
+            df_sample, output_target=output_target
+        )
 
-    # 3. Validate
-    plot_validation(gp_model, scaler, X_test, y_test, y_pred, y_std, df)
+        models[output_target] = gp_model
+        scalers[output_target] = scaler
 
-    # Optional: Save model for later use
-    import joblib
+        # 3. Validate
+        # plot_validation(gp_model, scaler, X_test, y_test, y_pred, y_std, df)
 
-    joblib.dump(gp_model, "gp_surrogate.pkl")
-    joblib.dump(scaler, "scaler.pkl")
+    save_surrogate_pack(models, scalers)
