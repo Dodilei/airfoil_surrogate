@@ -15,6 +15,7 @@ OUTPUT_COLS = [
     "cd_min",
     "cm_at_cdmin",
     "dclda",
+    "a0L",
 ]
 
 OUTPUT_PHYSICAL_BOUNDS = [
@@ -25,6 +26,7 @@ OUTPUT_PHYSICAL_BOUNDS = [
     (0.00, 0.04),  # cd_min
     (-0.4, -0.1),  # cm_at_cdmin
     (0.08, 0.15),  # dclda
+    (-15.0, -3.0),  # a0L
 ]
 
 
@@ -49,13 +51,16 @@ def get_mad_mask(points, threshold=4.0):
     return np.abs(modified_z_scores) <= threshold
 
 
-def save_data(input_samples, results, col_names, filename="surrogate_train_data"):
+def save_data(input_samples, results, filename="surrogate_train_data"):
     print()
     print("Saving data to CSV...", end="")
 
     all_data = np.concat([input_samples, results], axis=1)
 
-    df = pd.DataFrame(all_data, columns=col_names)
+    if all_data.shape[1] != len(INPUT_COLS + OUTPUT_COLS):
+        raise ValueError
+
+    df = pd.DataFrame(all_data, columns=INPUT_COLS + OUTPUT_COLS)
     df.to_csv(filename + ".csv", index=False)
 
     print(" Done.")
@@ -203,7 +208,7 @@ def histogram_train_data(data, bins=30):
 
     fig, axes = plt.subplots(2, 4, figsize=(16, 8))
 
-    for i in range(7):
+    for i in range(len(OUTPUT_COLS)):
         ax = axes.flatten()[i]
         ax.hist(results[:, i], bins=20, color="skyblue", edgecolor="black")
         ax.set_title(OUTPUT_COLS[i])

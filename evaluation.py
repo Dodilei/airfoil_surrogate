@@ -3,6 +3,7 @@ import aerosandbox
 from airfoil import morph_airfoil_ct, ct2coords
 from util import mellowmax
 
+from numpy.lib.stride_tricks import sliding_window_view
 from scipy.interpolate import PchipInterpolator
 
 
@@ -12,9 +13,7 @@ class AirfoilVarEvaluator(object):
         base_foil_ct,
         alpha_sim,
         alpha_target_specs,
-        slope_window_center=1.0,
-        slope_window_size=5.0,
-        slope_window_displacement=2.5,
+        slope_window_size=6.0,
     ):
         self.alpha_sim = alpha_sim
         self.alpha_target, at_step = np.linspace(*alpha_target_specs, retstep=True)
@@ -22,18 +21,10 @@ class AirfoilVarEvaluator(object):
 
         self.conv_threshold = len(alpha_sim) // 2
 
-        slope_window_start_idx = int(
-            (slope_window_center - slope_window_size / 2 - self.alpha_target[0])
-            / at_step
-        )
-        slope_window_size_idx = int(slope_window_size / at_step) + 1
-        slope_window_displacement_idx = int(slope_window_displacement / at_step)
-
-        self.slope_calculator = ThreeWindowSlope(
+        self.slope_calculator = ScanningSlopeFinder(
             self.alpha_target,
-            center_start_idx=slope_window_start_idx,
-            window_size=slope_window_size_idx,
-            displacement=slope_window_displacement_idx,
+            window_size_deg=slope_window_size,
+            alpha_bounds=[-1.5, 12.0],
         )
 
         self.xfoil_path = "xfoil"
@@ -57,7 +48,7 @@ class AirfoilVarEvaluator(object):
         )
 
         if len(conv_alpha) < self.conv_threshold:
-            return [np.nan] * 7
+            return [np.nan] * 8
 
         return self.extract_parameters(cl, cd, cm, conv_alpha)
 
@@ -76,9 +67,16 @@ class AirfoilVarEvaluator(object):
 
         cl_full = cl_mapper(self.alpha_target)
 
-        cl_max, cd_at_clmax, cm_at_clmax, cl_at_cdmin, cd_min, cm_at_cdmin, dclda = (
-            self.extract_parameters(cl, cd, cm, conv_alpha)
-        )
+        (
+            cl_max,
+            cd_at_clmax,
+            cm_at_clmax,
+            cl_at_cdmin,
+            cd_min,
+            cm_at_cdmin,
+            dclda,
+            a0L,
+        ) = self.extract_parameters(cl, cd, cm, conv_alpha)
 
         import matplotlib.pyplot as plt
 
@@ -119,22 +117,15 @@ class AirfoilVarEvaluator(object):
             label="CL CDmin",
         )
 
-        dclda_window = [
-            self.alpha_target[idx_half_range - mid_window_size],
-            self.alpha_target[idx_half_range + mid_window_size],
-        ]
-        cl_in_window = [
-            cl_full[idx_half_range - mid_window_size],
-            cl_full[idx_half_range + mid_window_size],
-        ]
+        dclda_window = np.array(
+            [
+                self.alpha_target[idx_half_range - mid_window_size],
+                self.alpha_target[idx_half_range + mid_window_size],
+            ]
+        )
         ax2.plot(
             dclda_window,
-            [
-                (cl_in_window[0] + cl_in_window[1]) / 2
-                - dclda * (dclda_window[1] - dclda_window[0]) / 2,
-                (cl_in_window[0] + cl_in_window[1]) / 2
-                + dclda * (dclda_window[1] - dclda_window[0]) / 2,
-            ],
+            dclda * (dclda_window - a0L),
             "g-.",
             label="dCl/dAlpha",
         )
@@ -242,7 +233,9 @@ class AirfoilVarEvaluator(object):
 
         cl_full = cl_mapper(self.alpha_target)
 
-        dclda = self.slope_calculator.get_best_slope(cl_full)
+        dclda, cl0 = self.slope_calculator.calculate(cl_full)
+
+        a0L = -cl0 / dclda
 
         return (
             cl_max,
@@ -252,113 +245,105 @@ class AirfoilVarEvaluator(object):
             cd_min,
             cm_at_cdmin,
             dclda,
+            a0L,
         )
 
 
-class ThreeWindowSlope:
-    def __init__(self, alpha_grid, center_start_idx, window_size, displacement):
+class ScanningSlopeFinder:
+    def __init__(
+        self,
+        alpha_grid,
+        window_size_deg=5.0,
+        alpha_bounds=(-5, 12),
+        min_slope=0.0,
+    ):
         """
-        SETUP PHASE: Pre-calculates all Alpha-dependent terms.
-        Runs ONCE.
+        Args:
+            window_size_deg (float): Range of alpha to include in the rolling window.
+            alpha_bounds (tuple): (min_alpha, max_alpha) in degrees. Only scans windows
+                                  within this range.
+            min_slope (float): Minimum slope to consider valid (rejects stall/negative slopes).
         """
-        self.window_size = window_size
-        n = window_size
 
-        # 1. Define the 3 sets of indices (Left, Center, Right)
-        # We ensure they stay within bounds
-        idx_c = center_start_idx
-        idx_l = max(0, center_start_idx - displacement)
-        idx_r = min(len(alpha_grid) - window_size, center_start_idx + displacement)
+        self.alpha_grid = alpha_grid
+        alpha_grid_step = np.diff(alpha_grid).mean()
 
-        self.indices = [
-            slice(idx_l, idx_l + window_size),
-            slice(idx_c, idx_c + window_size),
-            slice(idx_r, idx_r + window_size),
-        ]
-
-        # 2. Extract Alpha segments for these 3 windows
-        # Shape: (3, window_size)
-        self.alphas = np.array(
-            [
-                alpha_grid[self.indices[0]],
-                alpha_grid[self.indices[1]],
-                alpha_grid[self.indices[2]],
-            ]
+        self.window_size = int(round(window_size_deg / alpha_grid_step))
+        self.min_slope = min_slope
+        self.alpha_bounds = np.array(alpha_bounds) - np.array(
+            [0, self.window_size * alpha_grid_step]
         )
 
-        # 3. Pre-calculate Alpha Statistics (Vectorized for 3 windows)
-        # These are constant for every single execution!
-        self.Sx = np.sum(self.alphas, axis=1)  # Sum of X for each window
-        self.Sxx = np.sum(self.alphas**2, axis=1)  # Sum of X^2 for each window
-        self.n = n
-
-        # Denominator for Slope: n*Sxx - Sx^2
-        self.denom_slope = n * self.Sxx - self.Sx**2
-
-        # Pre-calculate terms for R2 denominator
-        # We need (n*Sxx - Sx^2) which is exactly denom_slope
-        self.denom_r2_part1 = self.denom_slope
-
-    def get_best_slope(self, cl_curve):
+    def calculate(self, cl):
         """
-        EXECUTION PHASE: Runs thousands of times.
-        Vectorized calculation of 3 slopes and 3 R2s.
+        Vectorized scanning of the Cl-alpha curve.
+        Returns the slope of the window with the highest R^2.
         """
-        # 1. Extract Cl segments (Fancy indexing)
-        # We assume cl_curve matches alpha_grid length
-        # We manually stack the slices to get a (3, N) array
-        # This is the only "slow" part, but faster than loops
-        ys = np.vstack(
-            [
-                cl_curve[self.indices[0]],
-                cl_curve[self.indices[1]],
-                cl_curve[self.indices[2]],
-            ]
+        alpha = self.alpha_grid
+
+        # Ensure we have enough points for at least one window
+        if len(alpha) < self.window_size:
+            raise ValueError
+
+        # 2. Restrict Search Space
+        valid_start_indices = (
+            alpha[: -self.window_size + 1] >= self.alpha_bounds[0]
+        ) & (alpha[: -self.window_size + 1] <= self.alpha_bounds[1])
+
+        if not np.any(valid_start_indices):
+            raise ValueError
+
+        # 3. Create Views (Vectorized Windows)
+        # Shape becomes (N_windows, window_size)
+        alpha_windows = sliding_window_view(alpha, window_shape=self.window_size)
+        cl_windows = sliding_window_view(cl, window_shape=self.window_size)
+
+        # Filter windows based on the bounds determined in step 2
+        # Note: sliding_window_view output length aligns with the valid_start_indices logic
+        alpha_windows = alpha_windows[valid_start_indices]
+        cl_windows = cl_windows[valid_start_indices]
+
+        # 4. Vectorized Linear Regression
+        # We calculate Slope and R^2 for ALL windows in parallel using matrix math.
+
+        # Calculate means for each window
+        x_bar = alpha_windows.mean(axis=1, keepdims=True)
+        y_bar = cl_windows.mean(axis=1, keepdims=True)
+
+        # Centered variables (residuals from mean)
+        dx = alpha_windows - x_bar
+        dy = cl_windows - y_bar
+
+        # Sum of Squared Errors
+        Sxx = np.sum(dx**2, axis=1, keepdims=True)
+        Syy = np.sum(dy**2, axis=1, keepdims=True)
+        Sxy = np.sum(dx * dy, axis=1, keepdims=True)
+
+        # 4. Slope and Intercept calculation
+        # m = Sxy / Sxx
+        # b = y_mean - m * x_mean
+        slopes = np.full(x_bar.shape, np.nan)
+        intercepts = np.full(x_bar.shape, np.nan)
+        r2 = np.full(x_bar.shape, -np.inf)
+
+        valid_mask = Sxx > 1e-10
+        slopes[valid_mask] = Sxy[valid_mask] / Sxx[valid_mask]
+        intercepts[valid_mask] = y_bar[valid_mask] - (
+            slopes[valid_mask] * x_bar[valid_mask]
         )
 
-        # 2. Calculate Y Statistics (Vectorized across the 3 rows)
-        Sy = np.sum(ys, axis=1)
-        Syy = np.sum(ys**2, axis=1)
-        Sxy = np.sum(self.alphas * ys, axis=1)  # Element-wise mult then sum
+        # R^2 calculation
+        r2_denom = Sxx * Syy
+        r2_mask = valid_mask & (r2_denom > 1e-10)
+        r2[r2_mask] = (Sxy[r2_mask] ** 2) / r2_denom[r2_mask]
 
-        # 3. Calculate Numerator (common to Slope and R2)
-        # Num = n*Sxy - Sx*Sy
-        numerator = self.n * Sxy - self.Sx * Sy
+        # 5. Physics Constraints
+        valid_candidates = slopes > self.min_slope
+        r2[~valid_candidates] = -np.inf
 
-        # 4. Calculate R2 for decision making
-        # R2 = Num^2 / ( (n*Sxx - Sx^2) * (n*Syy - Sy^2) )
-        denom_y = self.n * Syy - Sy**2
+        best_idx = np.argmax(r2)
 
-        # Avoid division by zero
-        denom_total = self.denom_r2_part1 * denom_y
+        if r2[best_idx] == -np.inf:
+            return np.nan, np.nan
 
-        # We calculate R2 scores
-        # (We use a safe divide or just ignore 0 denoms)
-        with np.errstate(divide="ignore", invalid="ignore"):
-            r2_scores = (numerator**2) / denom_total
-            r2_scores = np.nan_to_num(r2_scores)  # Handle NaNs
-
-        # 5. Pick the winner
-        best_idx = np.argmax(r2_scores)
-
-        # 6. Calculate Slope of the winner
-        # m = Num / Denom_Slope
-        best_slope = numerator[best_idx] / self.denom_slope[best_idx]
-
-        return best_slope
-
-
-def parameter_grid_generator(bounds, points_per_param):
-    # --- 2. GENERATE GRID ---
-    # Create the individual 1D arrays for each dimension
-    grids = [np.linspace(b[0], b[1], int(n)) for b, n in zip(bounds, points_per_param)]
-
-    # Generate the full cartesian product
-    # Note: 'indexing="ij"' is often preferred for matrix indexing,
-    # but default works fine for simple flattening.
-    mesh = np.meshgrid(*grids, indexing="ij")
-
-    # Flatten and stack to get shape (N_total_cases, M_parameters)
-    grid_coefficients = np.vstack([m.flatten() for m in mesh]).T
-
-    return grid_coefficients
+        return slopes.flatten()[best_idx], intercepts.flatten()[best_idx]

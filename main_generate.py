@@ -1,10 +1,13 @@
 import numpy as np
+import aerosandbox
+
+from concurrent.futures import ProcessPoolExecutor
+
 from util import generate_lhs
 from evaluation import AirfoilVarEvaluator
-import aerosandbox
-from concurrent.futures import ProcessPoolExecutor
 from airfoil import parse_airfoil_coordinates
 from train_data import save_data, histogram_train_data
+
 
 xfoil_path = "C:\\Portable\\xfoil.exe"
 
@@ -18,7 +21,7 @@ yt0 = 2 * (yu - yc0)
 
 original_specs = np.array(
     [0.12139, 0.1972, 0.08676, 0.47621]
-)  # log(R), tmax, tmaxpos, cmax, cmaxpos
+)  # tmax, tmaxpos, cmax, cmaxpos
 
 perc = 0.1
 bounds = original_specs[:, np.newaxis] * (1.0 + np.array([-perc, perc]))[np.newaxis, :]
@@ -40,9 +43,6 @@ evaluator = AirfoilVarEvaluator(
     base_foil_ct=(t1, yc0, yt0),
     alpha_sim=alpha_sim,
     alpha_target_specs=(-3, 17, 41),
-    slope_window_center=4.5,
-    slope_window_size=7.0,
-    slope_window_displacement=2.0,
 )
 
 evaluator.xfoil_config_set(path=xfoil_path, max_iter=75, timeout=35)
@@ -54,7 +54,7 @@ def evaluator_function(X):
 
 if __name__ == "__main__":
     print("Generating samples")
-    profile_samples = generate_lhs(bounds, n_samples=2000)
+    profile_samples = generate_lhs(bounds, n_samples=5)
 
     print("Evaluating samples (MP)...")
     print(end="")
