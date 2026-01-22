@@ -56,30 +56,33 @@ def evaluator_function(X):
 
 
 if __name__ == "__main__":
-    n_cores = 7
+    n_cores = 8
 
     print("Generating samples")
-    profile_samples = generate_lhs(bounds, n_samples=5)
+    profile_samples = generate_lhs(bounds, n_samples=500)
 
     print(f"Evaluating samples (multiprocess, {n_cores} cores)...")
     print(end="")
 
-    warnings.filterwarnings("ignore", category=UserWarning, module="aerosandbox")
+    warnings.filterwarnings("ignore", category=UserWarning)
 
     with ProcessPoolExecutor(max_workers=n_cores) as executor:
         # 1. Submit all tasks and create a list of future objects
-        futures = [executor.submit(evaluator_function, x) for x in profile_samples]
+        futures_map = {
+            executor.submit(evaluator_function, x): i
+            for i, x in enumerate(profile_samples)
+        }
 
         # 2. Wrap as_completed in tqdm for a live progress bar
-        results = []
+        results_map = {}
         for f in tqdm(
-            as_completed(futures),
-            total=len(futures),
+            as_completed(futures_map),
+            total=len(profile_samples),
             desc="Executing XFoil & Spec Evaluation",
         ):
-            results.append(f.result())
+            results_map[futures_map[f]] = f.result()
 
-    results = np.array(results)
+    results = np.array([results_map[i] for i in range(len(profile_samples))])
 
     print("Done.")
     print()

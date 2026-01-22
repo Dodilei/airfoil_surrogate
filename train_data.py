@@ -178,7 +178,9 @@ def audit_data_cleaning(df_original, df_cleaned):
     )
 
     # 2. Plot Distributions
-    fig, axes = plt.subplots(1, len(INPUT_COLS), figsize=(20, 4))
+    fig, axes = plt.subplots(2, int(np.ceil(len(INPUT_COLS) / 2)), figsize=(16, 8))
+
+    axes = axes.flatten()
 
     for i, col in enumerate(INPUT_COLS):
         # Plot Kept Data
@@ -206,7 +208,9 @@ def histogram_train_data(data, bins=30):
 
     # Visualize histogram of results for each of the 7 specs
 
-    fig, axes = plt.subplots(2, 4, figsize=(16, 8))
+    fig, axes = plt.subplots(2, round(len(OUTPUT_COLS) / 2), figsize=(16, 8))
+
+    axes = axes.flatten()
 
     for i in range(len(OUTPUT_COLS)):
         ax = axes.flatten()[i]
