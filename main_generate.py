@@ -4,7 +4,7 @@ from evaluation import AirfoilVarEvaluator
 import aerosandbox
 from concurrent.futures import ProcessPoolExecutor
 from airfoil import parse_airfoil_coordinates
-
+from train_data import save_data, histogram_train_data
 
 xfoil_path = "C:\\Portable\\xfoil.exe"
 
@@ -76,51 +76,6 @@ if __name__ == "__main__":
         f"Non-convergence rate: {np.isnan(results.sum(axis=1)).sum() / results.shape[0] * 100:.2f}%"
     )
 
-    print()
-    print("Saving results to CSV...", end="")
-    import pandas as pd
+    save_data(profile_samples, results, "surrogate_train_data")
 
-    all_data = np.concat([profile_samples, results], axis=1)
-
-    col_names = [
-        "log_Re",
-        "t_max",
-        "x_t",
-        "c_max",
-        "x_c",
-        "cl_max",
-        "cd_at_clmax",
-        "cm_at_clmax",
-        "cl_at_cdmin",
-        "cd_min",
-        "cm_at_cdmin",
-        "dclda",
-    ]
-
-    df = pd.DataFrame(all_data, columns=col_names)
-    df.to_csv("surrogate_train_data.csv", index=False)
-
-    print(" Done.")
-
-    print()
-    print("Visualizing results.")
-    # Visualize histogram of results for each of the 7 specs
-    import matplotlib.pyplot as plt
-
-    fig, axes = plt.subplots(2, 4, figsize=(16, 8))
-    metric_names = [
-        "Cl_max",
-        "Cd_at_Clmax",
-        "Cm_at_Clmax",
-        "Cl_at_Cdmin",
-        "Cd_min",
-        "Cm_at_Cdmin",
-        "dCl/dAlpha",
-    ]
-    for i in range(7):
-        ax = axes.flatten()[i]
-        ax.hist(results[:, i], bins=20, color="skyblue", edgecolor="black")
-        ax.set_title(metric_names[i])
-        ax.grid(True)
-    plt.tight_layout()
-    plt.show()
+    histogram_train_data(results)
