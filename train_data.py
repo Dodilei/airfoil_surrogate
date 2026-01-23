@@ -66,8 +66,8 @@ def save_data(input_samples, results, filename="surrogate_train_data"):
     print(" Done.")
 
 
-def load_data():
-    df = pd.read_csv(CSV_PATH)
+def load_data(csv_path):
+    df = pd.read_csv(csv_path)
     print(f"--- Loaded Data: {len(df)} rows ---")
     print()
 
@@ -114,14 +114,14 @@ def clean_data(
             outlier_mask = (df_clean[col] < bounds[0]) | (df_clean[col] > bounds[1])
             outlier_masks.append(outlier_mask)
             print(
-                f"    Found {outlier_mask.sum()} outliers ({(outlier_mask.sum() / len(df_clean)):.2f}%) from {col} based on physical bounds."
+                f"    Found {outlier_mask.sum()} outliers ({(100 * outlier_mask.sum() / len(df_clean)):.2f}%) from {col} based on physical bounds."
             )
 
         total_outliers = np.any(np.array(outlier_masks), axis=0)
         df_clean = df_clean[~total_outliers]
         step2_count = len(df_clean)
         print(
-            f"Removed {step1_count - step2_count} outliers ({((step1_count - step2_count) / step1_count):.2f}%)"
+            f"Removed {step1_count - step2_count} outliers ({(100 * (step1_count - step2_count) / step1_count):.2f}%)"
         )
     else:
         step2_count = step1_count
@@ -144,14 +144,14 @@ def clean_data(
             except ValueError:
                 bounds = (np.nan, np.nan)
             print(
-                f"    Found {np.sum(~mad_mask)} outliers ({(np.sum(~mad_mask) / len(df_clean)):.2f}%) from {col} using MAD. Bounds: [{bounds[0]:.3f}, {bounds[1]:.3f}]"
+                f"    Found {np.sum(~mad_mask)} outliers ({100 * (np.sum(~mad_mask) / len(df_clean)):.2f}%) from {col} using MAD. Bounds: [{bounds[0]:.3f}, {bounds[1]:.3f}]"
             )
 
         total_mad_outliers = np.any(np.array(mad_outlier_masks), axis=0)
         df_clean = df_clean[~total_mad_outliers]
         step3_count = len(df_clean)
         print(
-            f"Removed {step2_count - step3_count} outliers ({((step2_count - step3_count) / step2_count):.2f}%) using MAD."
+            f"Removed {step2_count - step3_count} outliers ({100 * ((step2_count - step3_count) / step2_count):.2f}%) using MAD."
         )
     else:
         step3_count = step2_count
