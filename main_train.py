@@ -1,12 +1,12 @@
-from train_data import (
+from data.train_data import (
     load_data,
     clean_data,
     histogram_train_data,
     audit_data_cleaning,
     OUTPUT_COLS,
 )
-from model_manager import save_surrogate_pack
-from surrogate import train_surrogate, evaluate_surrogate_physics
+from surrogate.model_manager import save_surrogate_pack
+from surrogate.surrogate import train_surrogate, evaluate_surrogate_physics
 
 
 # ==========================================
@@ -14,7 +14,7 @@ from surrogate import train_surrogate, evaluate_surrogate_physics
 # ==========================================
 if __name__ == "__main__":
     # 1. Load
-    df = load_data("surrogate_train_data_20p.csv")
+    df = load_data("./.train_data/surrogate_train_data_20p.csv")
     df_clean = clean_data(
         df,
         nan_filter=True,
@@ -55,4 +55,6 @@ if __name__ == "__main__":
             gp_model, scaler, df_sample, output_target, ["log_Re", "c_max"]
         )
 
-    save_surrogate_pack(models, scalers, output_folder="surrogate_models_v4")
+    save_surrogate_pack(
+        models, scalers, output_folder="./.surrogate_models/surrogate_models_v4"
+    )

@@ -1,19 +1,25 @@
 import numpy as np
-from cst_bezier import cst_bezier, cst_bezier_matrix
+from geometry.cst_bezier import cst_bezier, cst_bezier_matrix
 from scipy.interpolate import PchipInterpolator
 
 
 def camber_line(coefs):
     """Compute the camber line using CST Bezier representation."""
+
     # Class function for camber line (N1 = 1.0, N2 = 1.0)
-    class_function = lambda t: t**1.0 * (1 - t) ** 1.0
+    def class_function(t):
+        return t**1.0 * (1 - t) ** 1.0
+
     return cst_bezier(coefs, class_function)
 
 
 def thickness_distribution(coefs):
     """Compute the thickness distribution using CST Bezier representation."""
+
     # Class function for thickness distribution (N1 = 0.5, N2 = 1.0)
-    class_function = lambda t: t**0.5 * (1 - t) ** 1.0
+    def class_function(t):
+        return t**0.5 * (1 - t) ** 1.0
+
     return cst_bezier(coefs, class_function)
 
 
@@ -238,29 +244,3 @@ def ct2coords(airfoil_ct):
     coords = np.vstack((upper, lower[1:, :]))
 
     return coords
-
-
-# Example usage:
-if __name__ == "__main__":
-    # Define camber and thickness coefficients
-    camber_coefs = np.array([0.0, 0.1, 0.0])  # Example camber coefficients
-    thickness_coefs = np.array([0.2, 0.3, 0.2])  # Example thickness coefficients
-    degree = len(camber_coefs) - 1
-    te_thickness = 0.02  # Example trailing edge thickness
-
-    # Create airfoil shape function
-    airfoil = airfoil_shape(camber_coefs, thickness_coefs, te_thickness)
-
-    # Generate airfoil coordinates
-    coords = airfoil_coordinates(airfoil, num_points=100)
-
-    # Plot the coordinates as needed
-    import matplotlib.pyplot as plt
-
-    plt.plot(coords[:, 0], coords[:, 1], "-o", ms=2, lw=1)
-    plt.axis("equal")
-    plt.title("Airfoil Shape")
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.grid(True)
-    plt.show()

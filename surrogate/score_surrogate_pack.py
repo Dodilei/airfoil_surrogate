@@ -1,8 +1,8 @@
-from model_manager import load_surrogate_pack
-from surrogate import evaluate_surrogate_physics
-from train_data import load_data, clean_data
+from surrogate.model_manager import load_surrogate_pack
+from surrogate.surrogate import evaluate_surrogate_physics
+from data.train_data import load_data, clean_data
 
-df = load_data("surrogate_train_data.csv")
+df = load_data("surrogate_train_data_20p.csv")
 df_clean = clean_data(
     df,
     nan_filter=True,
@@ -14,7 +14,7 @@ df_clean = clean_data(df_clean, "cd_min", mad_filter=True, mad_filter_threshold=
 
 df_sample = df_clean.sample(n=1000)
 
-models, scalers = load_surrogate_pack("surrogate_models_v3")
+models, scalers = load_surrogate_pack("./.surrogate_models/surrogate_models_v4")
 
 for key in models:
     print()

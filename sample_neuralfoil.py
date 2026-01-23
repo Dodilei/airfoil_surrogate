@@ -1,7 +1,7 @@
 import numpy as np
 import neuralfoil
 import aerosandbox
-from airfoil import (
+from geometry.airfoil import (
     fit_airfoil_shape_kulfan,
     parse_airfoil_coordinates,
 )

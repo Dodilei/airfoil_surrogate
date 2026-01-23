@@ -1,10 +1,34 @@
 import numpy as np
 import aerosandbox
-from airfoil import morph_airfoil_ct, ct2coords
-from util import mellowmax
+from geometry.airfoil import morph_airfoil_ct, ct2coords
 
 from numpy.lib.stride_tricks import sliding_window_view
 from scipy.interpolate import PchipInterpolator
+
+
+def mellowmax(x, alpha=100):
+    """
+    Calculates Mellowmax.
+    alpha > 0  => Soft Maximum (approximates max)
+    alpha < 0  => Soft Minimum (approximates min)
+    """
+    x = np.array(x)
+
+    # 1. Conditioning to prevent overflow
+    # For Max (alpha > 0): shift by subtracting actual max
+    # For Min (alpha < 0): shift by subtracting actual min
+    if alpha > 0:
+        shift = np.max(x)
+    else:
+        shift = np.min(x)
+
+    # 2. The Stable Formula
+    # MM(x) = shift + (1/alpha) * ln( mean( exp(alpha * (x - shift)) ) )
+    n = len(x)
+    scaled_exp_sum = np.sum(np.exp(alpha * (x - shift)))
+
+    # Note: We use n (mean) inside the log, unlike KS/LSE which use sum.
+    return shift + (np.log(scaled_exp_sum / n) / alpha)
 
 
 class AirfoilVarEvaluator(object):

@@ -51,7 +51,9 @@ def get_mad_mask(points, threshold=4.0):
     return np.abs(modified_z_scores) <= threshold
 
 
-def save_data(input_samples, results, filename="surrogate_train_data"):
+def save_data(
+    input_samples, results, filename="./.train_data/surrogate_train_data.csv"
+):
     print()
     print("Saving data to CSV...", end="")
 
@@ -61,7 +63,7 @@ def save_data(input_samples, results, filename="surrogate_train_data"):
         raise ValueError
 
     df = pd.DataFrame(all_data, columns=INPUT_COLS + OUTPUT_COLS)
-    df.to_csv(filename + ".csv", index=False)
+    df.to_csv(filename, index=False)
 
     print(" Done.")
 

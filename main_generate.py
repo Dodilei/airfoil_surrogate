@@ -6,10 +6,10 @@ import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 
-from util import generate_lhs
-from evaluation import AirfoilVarEvaluator
-from airfoil import parse_airfoil_coordinates
-from train_data import save_data, histogram_train_data
+from evaluation.lhs import generate_lhs
+from evaluation.evaluation import AirfoilVarEvaluator
+from geometry.airfoil import parse_airfoil_coordinates
+from data.train_data import save_data, histogram_train_data
 
 
 xfoil_path = "C:\\Portable\\xfoil.exe"
@@ -92,6 +92,6 @@ if __name__ == "__main__":
         f"Non-convergence rate: {np.isnan(results.sum(axis=1)).sum() / results.shape[0] * 100:.2f}%"
     )
 
-    save_data(profile_samples, results, "surrogate_train_data_20p")
+    save_data(profile_samples, results, "./.train_data/surrogate_train_data_20p.csv")
 
     histogram_train_data(results)
