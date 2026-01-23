@@ -26,7 +26,7 @@ original_specs = np.array(
     [0.12139, 0.1972, 0.08676, 0.47621]
 )  # tmax, tmaxpos, cmax, cmaxpos
 
-perc = 0.1
+perc = 0.2
 bounds = original_specs[:, np.newaxis] * (1.0 + np.array([-perc, perc]))[np.newaxis, :]
 
 log_reynolds_bounds = np.array([np.log(1e5), np.log(4e5)])
@@ -46,6 +46,7 @@ evaluator = AirfoilVarEvaluator(
     base_foil_ct=(t1, yc0, yt0),
     alpha_sim=alpha_sim,
     alpha_target_specs=(-3, 17, 41),
+    slope_window_size=7.5,
 )
 
 evaluator.xfoil_config_set(path=xfoil_path, max_iter=75, timeout=35)
@@ -59,7 +60,7 @@ if __name__ == "__main__":
     n_cores = 8
 
     print("Generating samples")
-    profile_samples = generate_lhs(bounds, n_samples=500)
+    profile_samples = generate_lhs(bounds, n_samples=3000)
 
     print(f"Evaluating samples (multiprocess, {n_cores} cores)...")
     print(end="")
@@ -91,6 +92,6 @@ if __name__ == "__main__":
         f"Non-convergence rate: {np.isnan(results.sum(axis=1)).sum() / results.shape[0] * 100:.2f}%"
     )
 
-    save_data(profile_samples, results, "surrogate_train_data")
+    save_data(profile_samples, results, "surrogate_train_data_20p")
 
     histogram_train_data(results)
