@@ -1,6 +1,7 @@
 __pycache__
 *.pyc
-./surrogate_models/*
+./surrogate_models*/
 registry.json
 *.joblib
 settings.json
+*.csv
