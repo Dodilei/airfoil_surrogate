@@ -16,8 +16,12 @@ The script `main_generate.py` loads an initial airfoil and morphs it into many v
 
 ## Surrogate model
 
-The methods for creating and training surrogate models are defined in the module `surrogate.py`. Additionally, useful methods for saving, loading, and scoring/validating models are defined in `model_manager.py` and `score_surrogate_pack.py`.
+The methods for creating and training surrogate models are defined in the module `surrogate.py`. Additionally, useful methods for saving and loading models are defined in `model_manager.py`.
 
 ## Training the surrogate model
 
 The script `main_train.py` contains the workflow for loading and cleaning training data, initializing and training the surrogate models, and saving the resulting models for further use.
+
+## Scoring the surrogate models
+
+The script `score_surrogate_pack.py` provides code to score/validate all models trained.
